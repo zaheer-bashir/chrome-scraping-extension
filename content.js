@@ -3,17 +3,25 @@ var brand_name = 'Brother';
 var base_url      = window.location.href;
 
 
-chrome.storage.sync.get('productDetail', function (storage) {
-    if ( storage.productDetail == true && storage.baseURL != ''  ) {
+chrome.storage.sync.get(['productDetail' , 'baseURL' , 'parentCategory' , 'childCategory'], function (storage) {
+    if ( storage.productDetail == true && storage.baseURL != '' && storage.parentCategory != '' && storage.childCategory != '' ) {
         base_url = storage.baseURL;
+        parent_category = storage.parentCategory;
+        console.log(parent_category);
+        child_category = storage.childCategory;
+        console.log(child_category);
         console.log("product detail page landed");
         var productinfo  = [];
         productinfo.push({"product_name" : $(".product_page_wrap").find(".product_info").children("h1").text()});
         productinfo.push({ "product_image" : $(".product_page_wrap").find("figure").children("a").attr("href")});
         var productColors = [];
         $(".product_info").find("img").each(function (index) {
-           productColors.push(  $(this).attr("alt") );
-        })
+            productColors.push($(this).attr("alt"));
+        });
+        console.log( productColors);
+        productinfo.push({ "colors" : productColors});
+        productinfo.push({"parent" : parent_category});
+        productinfo.push({"child" : child_category});
         productinfo.push({ "regular_price" : $(".old-price").find(".price").text() });
         productinfo.push({ "sale_price" : $(".special-price").find(".price").text() });
         productinfo.push({ "short_description" : $(".ldp-short-description").text() });
@@ -29,70 +37,73 @@ chrome.storage.sync.get('productDetail', function (storage) {
             var attrName = th;
             if ( th == 'SKU') {
                 specs.push({
-                    "SKU": td
+                    "sku": td
                 });
             }
             if ( th == 'Printer Brand') {
                 specs.push({
-                    "Printer Brand": td
+                    "printer_brand": td
                 });
             }
             if ( th == 'OEM Number') {
                 specs.push({
-                    "OEM Number": td
+                    "oem_number": td
                 });
             }
             if ( th == 'Ink Color') {
                 specs.push({
-                    "Ink Color": td
+                    "ink_color": td
                 });
             }
             if ( th == 'Cartridge Yield Type') {
                 specs.push({
-                    "Cartridge Yield Type": td
+                    "cartridge_yield_type": td
                 });
             }
             if ( th == 'Page Yield') {
                 specs.push({
-                    "Page Yield": td
+                    "page_yield": td
                 });
             }
             if ( th == 'Cost Per Page') {
                 specs.push({
-                    "Cost Per Page": td
+                    "cost_per_page": td
                 });
             }
             if ( th == 'Shelf Life') {
                 specs.push({
-                    "Shelf Life": td
+                    "shelf_life": td
                 });
             }
         });
         console.log("-------Product specs------------- ")
         console.log(specs);
         console.log("-------Product specs------------- ");
-
-        var products_data = $.merge(productinfo , specs );
+        console.log ( "----------" );
+        console.log ( storage.baseURL );
+        console.log ( "----------");
+        var products_data = $.merge(productinfo , specs);
 
         console.log(products_data);
         // Ajax Request To Insert Parent Categories
+        let site_url = 'https://tonerbird.com/';
+
+        $.ajax({
+            url: site_url + "wp-json/tonerbird/v1/products",
+            method: "POST",
+            data: JSON.stringify( products_data ),
+            contentType: "application/json",
+            dataType: "json"
+        }).done(function (resp) {
+            console.log(resp);
+            console.log("Product Successfully inserted!!!!!");
+
+        });
 
         setTimeout(function () {
-            let site_url = 'https://tonerbird.com/';
-
-            $.ajax({
-                url: site_url + "wp-json/tonerbird/v1/products",
-                method: "POST",
-                data: JSON.stringify( products_data ),
-                contentType: "application/json",
-                dataType: "json"
-            }).done(function (resp) {
-                console.log(resp);
-                console.log("Product Successfully inserted!!!!!");
-                window.location.href = base_url;
-            });
-
-        }, 3000);
+            chrome.storage.sync.set({ 'productDetail' : false , 'productActive' : true })
+            location.href = storage.baseURL;
+        }, 10000);
 
 
     }
@@ -105,9 +116,9 @@ chrome.storage.sync.get(['startScrape', 'brand'] , function ( storage) {
     if ( storage.startScrape == true && storage.brand  != '' ) {
         // Scrape Printer Family
 
-        chrome.storage.sync.get('parentCatActive', function (storage) {
+        chrome.storage.sync.get('parentCatActive' , function (storage) {
 
-            if (storage.parentCatActive == true) {
+            if (storage.parentCatActive == true ) {
                 var pcategories = [];
                 var parentCatLength = $(".products-grid").find(".printer-set").length;
                 for (var i = 0; i < parentCatLength; i++) {
@@ -191,31 +202,37 @@ chrome.storage.sync.get(['startScrape', 'brand'] , function ( storage) {
 
         // Scrape Printer Products
 
-        chrome.storage.sync.get('productActive', function (storage) {
+        chrome.storage.sync.get( ['productActive' , 'productDetail' ], function (storage) {
 
-            if (storage.productActive == true) {
+            // Set timeout to redirect other page
+
+            setTimeout( function ( ) {
+
+            if (storage.productActive == true && storage.productDetail == false) {
                 var currentUrl = window.location.href;
                 // Count List Products
                 var printersLength = $(".printer-list-item").length;
-
                 chrome.storage.sync.get('index', function (storage) {
                     console.log(storage.index);
                     if (storage.index < printersLength) {
+                        var count = storage.index;
                         var printer = $(".printer-list-item").eq( storage.index );
-                        console.log(printer);
-                        var count = 0;
+                        console.log( printer );
                         $(printer).each(function (index) {
                             var printer_detail = $(printer).find("h3").children("a").attr("href");
                             console.log(printer_detail);
                             count++;
+                            console.log("Count: " + count);
                             chrome.storage.sync.set({"index" : count , "baseURL" : base_url , "productActive" : false , "productDetail" : true })
-                            window.location.href = printer_detail;
+                            location.href = printer_detail;
                         });
                     }
                 })
 
             }
-        });
+
+            } , 10000);
+            });
 
     }
 });
@@ -238,6 +255,7 @@ function start_scrape()
          * **/
 
             chrome.storage.sync.get(["parentCatActive" , "childCatActive" , "productActive"] , function ( storage ) {
+
                     if ( storage.parentCatActive == true ){
                         var pcategories = [];
                         var parentCatLength = $(".products-grid").find(".printer-set").length;
@@ -541,7 +559,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
     console.log('runtime');
     if(request.todo == "startScrap") {
         console.log("start scrape ");
-        chrome.storage.sync.set({'startScrape' : true , 'brand': 'Brother' ,'parentCatActive': false , 'childCatActive': false , 'productActive' : true , 'productCategory' : "MFC-210C" , 'index' : 0 });
+        chrome.storage.sync.set({'startScrape' : true , 'brand': 'Brother' ,'parentCatActive': false , 'childCatActive': false , 'productActive' : true , 'productDetail' : false ,'parentCategory' : 'MFC MultiFunction Printers' ,'childCategory' : "MFC-8460N" , 'index' : 0 });
         window.location.reload();
     }
 
